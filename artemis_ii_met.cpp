@@ -17,6 +17,13 @@ namespace {
 
 volatile std::sig_atomic_t g_running = 1;
 constexpr char kDefaultLaunchUtc[] = "2026-04-01T22:24:00Z";
+// Alternate launch attempts kept here for later reference if needed:
+// 2026-04-02T23:22:00Z
+// 2026-04-04T00:00:00Z
+// 2026-04-05T00:53:00Z
+// 2026-04-06T01:40:00Z
+// 2026-04-07T02:36:00Z
+// 2026-04-30T22:06:00Z
 
 struct MissionEvent {
   const char* name;
@@ -97,19 +104,6 @@ class TerminalInputMode {
   termios original_{};
   bool enabled_ = false;
 };
-
-const std::vector<std::string>& launch_attempts() {
-  static const std::vector<std::string> kLaunchAttempts = {
-      "2026-04-01T22:24:00Z",
-      "2026-04-02T23:22:00Z",
-      "2026-04-04T00:00:00Z",
-      "2026-04-05T00:53:00Z",
-      "2026-04-06T01:40:00Z",
-      "2026-04-07T02:36:00Z",
-      "2026-04-30T22:06:00Z",
-  };
-  return kLaunchAttempts;
-}
 
 const std::vector<MissionEvent>& mission_timeline() {
   static const std::vector<MissionEvent> kTimeline = {
@@ -262,35 +256,11 @@ void print_usage(const char* program_name) {
   std::cerr
       << "Usage: " << program_name << " [--json] [--once] [--compact] [--launch <launch-utc>] [launch-utc]\n"
       << "Default launch UTC: " << kDefaultLaunchUtc << '\n'
-      << "Known launch attempts:\n";
-  for (const auto& attempt : launch_attempts()) {
-    std::cerr << "  " << attempt << '\n';
-  }
-  std::cerr
       << "Examples:\n"
       << "  " << program_name << '\n'
       << "  " << program_name << " --once\n"
       << "  " << program_name << " --json --once\n"
       << "  " << program_name << " 2026-04-01T22:24:00Z\n";
-}
-
-std::string build_attempt_summary(const std::string& active_launch_timestamp) {
-  bool first = true;
-  std::ostringstream output;
-  for (const auto& attempt : launch_attempts()) {
-    if (attempt == active_launch_timestamp) {
-      continue;
-    }
-
-    if (!first) {
-      output << ", ";
-    }
-
-    output << attempt;
-    first = false;
-  }
-
-  return output.str();
 }
 
 std::string colorize(const char* color, const std::string& text) {
@@ -300,8 +270,8 @@ std::string colorize(const char* color, const std::string& text) {
 std::string make_row(const std::string& label, const std::string& value) {
   std::ostringstream output;
   output << colorize(kColorLabel, label);
-  if (label.size() < 11) {
-    output << std::string(11 - label.size(), ' ');
+  if (label.size() < 14) {
+    output << std::string(14 - label.size(), ' ');
   }
   output << value;
   return output.str();
@@ -378,11 +348,13 @@ std::string build_text_output(const Options& options,
   output << colorize(kColorTitle, "ARTEMIS II MISSION ELAPSED TIME") << '\n';
   output << colorize(kColorAccent, "================================") << '\n';
   output << make_row("MET", colorize(met_color.c_str(), std::string(met_prefix) + met_value))
+         << '\n'
          << '\n';
   output << make_row("Launch UTC", format_utc_time(launch_time)) << '\n';
   output << make_row("Now UTC", format_utc_time(now_seconds)) << '\n';
   output << make_row("Mission UTC", format_utc_time(mission_now)) << '\n';
-  output << make_row("Now Local", format_local_time(now_seconds)) << '\n';
+  output << make_row("Now Local", format_local_time(now_seconds)) << '\n'
+         << '\n';
 
   if (hold_state.active) {
     output << make_row("Hold", colorize(kColorHold, "ACTIVE")) << '\n';
@@ -390,14 +362,17 @@ std::string build_text_output(const Options& options,
                        colorize(kColorHold, format_duration(now_seconds - hold_state.started_at)))
            << '\n';
     output << make_row("Status", colorize(kColorHold, "COUNTDOWN PAUSED - PRESS SPACE TO RESUME"))
+           << '\n'
            << '\n';
   } else if (hold_state.total_seconds > 0) {
     output << make_row("Hold", colorize(kColorAccent, "Released")) << '\n';
     output << make_row("Hold Time", colorize(kColorAccent, format_duration(hold_state.total_seconds)))
            << '\n';
-    output << make_row("Control", colorize(kColorAccent, "Press SPACE to enter hold")) << '\n';
+    output << make_row("Control", colorize(kColorAccent, "Press SPACE to enter hold")) << '\n'
+           << '\n';
   } else {
-    output << make_row("Control", colorize(kColorAccent, "Press SPACE to enter hold")) << '\n';
+    output << make_row("Control", colorize(kColorAccent, "Press SPACE to enter hold")) << '\n'
+           << '\n';
   }
 
   if (delta < 0) {
@@ -410,10 +385,6 @@ std::string build_text_output(const Options& options,
                                     format_duration(-delta)))
            << '\n';
     output << make_row("Attempt", launch_timestamp);
-    const std::string alternates = build_attempt_summary(launch_timestamp);
-    if (!alternates.empty()) {
-      output << '\n' << make_row("Alternates", alternates);
-    }
     return output.str();
   }
 
@@ -469,14 +440,6 @@ std::string build_json_output(std::time_t launch_time,
   if (delta < 0) {
     output << "\"phase\":\"" << (hold_state.active ? "Planned Hold" : "Countdown to Launch")
            << "\",";
-    output << "\"launchAttempts\":[";
-    for (std::size_t index = 0; index < launch_attempts().size(); ++index) {
-      if (index != 0) {
-        output << ",";
-      }
-      output << "\"" << launch_attempts()[index] << "\"";
-    }
-    output << "],";
     output << "\"nextEvent\":{\"name\":\"Launch\",\"offsetSeconds\":0,\"secondsFromNow\":" << -delta
            << "}";
   } else {

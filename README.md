@@ -16,10 +16,6 @@ c++ -std=c++17 -O2 -Wall -Wextra -pedantic -o artemis_ii_met artemis_ii_met.cpp
 
 The default launch timestamp is `2026-04-01T22:24:00Z`.
 
-The binary also includes these later launch attempts as built-in alternates:
-`2026-04-02T23:22:00Z`, `2026-04-04T00:00:00Z`, `2026-04-05T00:53:00Z`,
-`2026-04-06T01:40:00Z`, `2026-04-07T02:36:00Z`, and `2026-04-30T22:06:00Z`.
-
 You can override it with a UTC ISO-8601 timestamp:
 
 ```sh
